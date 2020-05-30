@@ -65,15 +65,15 @@ public:
         }
         return 0;
     }
-    int init(string map_uri) {
+    bool init(string map_uri) {
         load_map(map_uri);
-
+        going = LEFT;
+        return true;
     }
-    int tick(int lastinput) {
-        move(lastinput);
-        return 0;
+    bool tick(int lastinput) {
+        return move(lastinput);
     }
-    int move(int direction) {
+    bool move(int direction) {
         switch (direction) {
             case UP:
                 if (going != DOWN) going = UP;
@@ -109,7 +109,6 @@ public:
                 if (go_tile == EMPTY) {
                     // Basic move
                     pos tail = body.back();
-
                     body.pop_back();
                     map[tail.y][tail.x] = EMPTY;
 
@@ -118,19 +117,32 @@ public:
                 } else if (go_tile == GROWTH) {
                     body.push_front(go);
                     map[go.y][go.x] = BODY;
+                } else if (go_tile == POISON) {
+                    pos tail = body.back();
+                    body.pop_back();
+                    map[tail.y][tail.x] = EMPTY;
+
+                    tail = body.back();
+                    body.pop_back();
+                    map[tail.y][tail.x] = EMPTY;
+                    
+                    body.push_front(go);
+                    map[go.y][go.x] = BODY;
+                    if (body.size()<3) return false;
                 }
                 
             } else {
-                // TODO: Game over
+                // Game over
+                return false;
             }
         }
-        return 0;
+        return true;
     }
     bool can_go(pos go) {
         if ((map[go.y][go.x] == WALL) || (map[go.y][go.x] == IWALL)) return false;
         return true;
     }
-    int draw() {
+    void draw() {
         for (int y=0; y<21; y++) {
             for (int x=0; x<21; x++) {
                 int now = map[y][x];
@@ -179,7 +191,9 @@ int main() {
         int now = getms();
         int dt = now - lasttime;
         if (dt>=500) {
-            game.tick(lastinput);
+            if (!game.tick(lastinput)) {
+                // Game over
+            }
             game.draw();
 
             wrefresh(game_win);
