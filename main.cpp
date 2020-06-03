@@ -1,18 +1,24 @@
 #include <ncurses.h>
 #include <chrono>
 #include <string>
+#include <ctime>
+#include <algorithm>
 #include <fstream>
 #include <deque>
+#include <cstring>
 using namespace std;
 
+const int INFO = -2;
 const int BKGRD = -1;
 const int BODY = 1;
 const int WALL = 2;
-const int IWALL = 3;
-const int POISON = 4;
-const int GROWTH = 5;
-const int GATE = 6;
-const int EMPTY = 7;
+const int CENTER_WALL = 3;
+const int IWALL = 4;
+const int POISON = 5;
+const int GROWTH = 6;
+const int GATE1 = 7;
+const int GATE2 = 8;
+const int EMPTY = 9;
 
 const int NONE = -1;
 const int DOWN = 0;
@@ -35,17 +41,27 @@ class Game{
 public:
     int map[21][21];
     int going = NONE;
+    int item_pos[3][2];
+    int gate_pos[2][3];
+    int itemcooltime;
+    int sc_growth = 0; int sc_poison = 0; int sc_gate = 0;
+    int mission[4]; //B,Grwoth,Poison,Gate
+
     deque<pos> body;
     WINDOW* win;
-    Game(WINDOW* win) {
+    WINDOW* info;
+    Game(WINDOW* win, WINDOW* info) {
         this->win = win;
+        this->info = info;
         init_pair(EMPTY, COLOR_WHITE, COLOR_WHITE);
         init_pair(BODY, COLOR_YELLOW, COLOR_YELLOW);
         init_pair(WALL, COLOR_CYAN, COLOR_CYAN);
+        init_pair(CENTER_WALL, COLOR_CYAN, COLOR_CYAN);
         init_pair(IWALL, COLOR_CYAN, COLOR_CYAN);
         init_pair(GROWTH, COLOR_GREEN, COLOR_GREEN);
         init_pair(POISON, COLOR_RED, COLOR_RED);
-        init_pair(GATE, COLOR_MAGENTA, COLOR_MAGENTA);
+        init_pair(GATE1, COLOR_MAGENTA, COLOR_MAGENTA);
+        init_pair(GATE2, COLOR_MAGENTA, COLOR_MAGENTA);
     }
     int load_map(string uri) {
         ifstream readfile;
@@ -56,8 +72,8 @@ public:
                 readfile.getline(tmp, 64);
                 for (int x=0; x<21; x++) {
                     map[y][x] = tmp[x]-48;
-                    if (map[y][x]==0) map[y][x]=7;
-                    else if (map[y][x]==1) body.push_back(pos{y, x});
+                    if (map[y][x]==0) map[y][x]=EMPTY;
+                    else if (map[y][x]==BODY) body.push_back(pos{y, x});
                 }
             }
         } else {
@@ -65,28 +81,123 @@ public:
         }
         return 0;
     }
+    void add_mission(){
+        srand((unsigned int)time(0));
+        mission[0] = rand()%10 + 1;
+        mission[1] = rand()%5 + 1;
+        mission[2] = rand()%5 + 1;
+        mission[3] = rand()%3 + 1;
+    }
+    bool mission_check(){
+        if(mission[1] <= sc_growth && mission[2] <= sc_poison) return true;
+        return false;
+    }
+    void clear_item(){
+        for(int i = 0; i<3; i++){
+            if(map[item_pos[i][0]][item_pos[i][1]]!=BODY) map[item_pos[i][0]][item_pos[i][1]] = EMPTY;
+        }
+        wrefresh(win);
+    }
+    void random_item(){
+        srand((unsigned int)time(0));
+        int percent = rand()%4;
+        for(int i = 0; i<percent; i++){
+            while(true){
+                int item_y = rand()%17 + 2; //1~19 random
+                int item_x = rand()%17 + 2;
+                if(map[item_y][item_x] == EMPTY){
+                    map[item_y][item_x] = GROWTH;
+                    item_pos[i][0] = item_y;
+                    item_pos[i][1] = item_x;
+                    break;
+                }
+            }
+        } //growth
+        for(int i = percent; i<3; i++){
+            while(true){
+                int item_y = rand()%17 + 2; //1~19 random
+                int item_x = rand()%17 + 2;
+                if(map[item_y][item_x] == EMPTY){
+                    map[item_y][item_x] = POISON;
+                    item_pos[i][0] = item_y;
+                    item_pos[i][1] = item_x;
+                    break;
+                }
+            }
+        } //poision
+    }  
+    void random_gate(){
+        srand((unsigned int)time(0));
+        int gate_y, gate_x;
+        while(true){
+            gate_y = rand()%21;
+            gate_x = rand()%21;
+            if(map[gate_y][gate_x] == WALL || map[gate_y][gate_x] == CENTER_WALL){
+                gate_pos[0][0] = gate_y;
+                gate_pos[0][1] = gate_x;
+                if(map[gate_y][gate_x] == WALL) gate_pos[0][2] = 0;
+                else gate_pos[0][2] = 1;
+                break;
+            }
+        }
+        map[gate_y][gate_x] = GATE1;
+        while(true){
+            gate_y = rand()%21;
+            gate_x = rand()%21;
+            if((map[gate_y][gate_x] == WALL || map[gate_y][gate_x] == CENTER_WALL) && gate_y != gate_pos[0][0] && gate_x != gate_pos[0][1]){
+                gate_pos[1][0] = gate_y;
+                gate_pos[1][1] = gate_x;
+                if(map[gate_y][gate_x] == WALL) gate_pos[0][2] = 0;
+                else gate_pos[0][2] = 1;
+                break;
+            }
+        }
+        map[gate_y][gate_x] = GATE2;
+    }    
     bool init(string map_uri) {
         load_map(map_uri);
         going = LEFT;
+        random_item();
+        random_gate();
+        add_mission();
         return true;
     }
     bool tick(int lastinput) {
         return move(lastinput);
     }
+    void item_tick(){
+        clear_item();
+        random_item();
+    }
+    void using_gate(){
+
+    }
     bool move(int direction) {
         switch (direction) {
             case UP:
-                if (going != DOWN) going = UP;
-                break;
+                if (going != DOWN){
+                    going = UP;
+                    break;
+                }
+                else return false;
             case DOWN:
-                if (going != UP) going = DOWN;
-                break;
+                if (going != UP){
+                    going = DOWN; 
+                    break;
+                } 
+                else return false;
             case LEFT:
-                if (going != RIGHT) going = LEFT;
-                break;
+                if (going != RIGHT){
+                    going = LEFT;
+                    break;
+                }
+                else return false;
             case RIGHT:
-                if (going != LEFT) going = RIGHT;
-                break;
+                if (going != LEFT){
+                    going = RIGHT;
+                    break;
+                } 
+                else return false;
         }
         if (going != NONE) {
             pos go = body.front();
@@ -115,9 +226,13 @@ public:
                     body.push_front(go);
                     map[go.y][go.x] = BODY;
                 } else if (go_tile == GROWTH) {
+                    sc_growth += 1;
+                    if(mission_check()) return false;
                     body.push_front(go);
                     map[go.y][go.x] = BODY;
                 } else if (go_tile == POISON) {
+                    sc_poison += 1;
+                    if(mission_check()) return false;
                     pos tail = body.back();
                     body.pop_back();
                     map[tail.y][tail.x] = EMPTY;
@@ -129,6 +244,27 @@ public:
                     body.push_front(go);
                     map[go.y][go.x] = BODY;
                     if (body.size()<3) return false;
+                } else if (go_tile == GATE1){
+                    sc_gate += 1;
+                    if(mission_check()) return false;
+                    if(gate_pos[1][2] == 0){
+                        if(gate_pos[0][1] == 0){
+                            going = RIGHT;
+                        }
+                        else if(gate_pos[0][1] == 20){
+                            going = LEFT;
+                        }
+                        else if(gate_pos[0][0] == 0){
+                            going = DOWN;
+                        }
+                        else{
+                            going = UP;
+                        }
+                    }
+                } else if (go_tile == GATE2){
+                    if(gate_pos[0][2] == 0 && gate_pos[1][2] == 0){
+                        
+                    }
                 }
                 
             } else {
@@ -139,7 +275,7 @@ public:
         return true;
     }
     bool can_go(pos go) {
-        if ((map[go.y][go.x] == WALL) || (map[go.y][go.x] == IWALL)) return false;
+        if ((map[go.y][go.x] == WALL)  || (map[go.y][go.x] == CENTER_WALL) || (map[go.y][go.x] == IWALL) || (map[go.y][go.x] == BODY)) return false;
         return true;
     }
     void draw() {
@@ -159,7 +295,7 @@ public:
 int main() {
     // Ncurses setting
     WINDOW* game_win;
-    WINDOW* info;
+    WINDOW* info_win;
 
     initscr();
     start_color();
@@ -171,40 +307,59 @@ int main() {
 
     game_win = newwin(21, 42, 1, 1);
     wbkgd(game_win, COLOR_PAIR(1));
+    mvwprintw(game_win, 1, 1, "A new window");
     wrefresh(game_win);
+
+    init_pair(INFO, COLOR_RED, COLOR_YELLOW);
+    info_win = newwin(13, 13, 1, 45);
+    wbkgd(info_win, COLOR_PAIR(1));
+    wattron(info_win, COLOR_PAIR(1));
+    mvwprintw(info_win, 1, 1, "A new window");
+    wborder(info_win, '@','@','@','@','@','@','@','@');
+    wrefresh(info_win);
 
     keypad(stdscr, TRUE);
     curs_set(0);
     noecho();
     nodelay(stdscr, TRUE);
 
-    // Game setting
-    Game game(game_win);
-    int lastinput = NONE;
-    int lasttime = getms();
-    game.init("maps/1");
+    for(int i = 1; i<=5; i++){
+        // Game setting
+        Game game(game_win, info_win);
+        int lastinput = NONE;
+        int lasttime = getms();
+        int itemtime = getms();
+        game.init("maps/" + to_string(i));
 
-    // Main loop
-    while (true) {
-        int i = getch();
-        if (258<=i && i<=261) lastinput = i - 258;
-        int now = getms();
-        int dt = now - lasttime;
-        if (dt>=500) {
-            if (!game.tick(lastinput)) {
-                // Game over
+        // Main loop
+        while (true) {
+            int i = getch();
+            if (258<=i && i<=261) lastinput = i - 258;
+            int now = getms();
+            int item_now = getms();
+            int dt = now - lasttime;
+            int item_dt = now - itemtime;
+            if (item_dt>=6000){
+                game.item_tick();
+                itemtime = now;
             }
-            game.draw();
+            if (dt>=500) {
+                if (!game.tick(lastinput)) {
+                    // Game over
+                    break;
+                }
+                game.draw();
 
-            wrefresh(game_win);
-            lasttime = now;
-            lastinput = NONE;
+                wrefresh(game_win);
+                wrefresh(info_win);
+                lasttime = now;
+                lastinput = NONE;
+            }
         }
-    }
 
-    getch();
+        getch();
+    }
     delwin(game_win);
     endwin();
-
     return 0;
 }
