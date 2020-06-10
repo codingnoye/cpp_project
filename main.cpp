@@ -169,7 +169,7 @@ int main() {
     border('*', '*', '*', '*', '*', '*', '*', '*');
     refresh();
 
-    game_win = newwin(21, 42, 1, 1);
+    game_win = newwin(22, 42, 1, 1);
     wbkgd(game_win, COLOR_PAIR(1));
     wrefresh(game_win);
 
@@ -190,7 +190,7 @@ int main() {
         if (258<=i && i<=261) lastinput = i - 258;
         int now = getms();
         int dt = now - lasttime;
-        if (dt>=500) {
+        if (dt>=300) {
             if (!game.tick(lastinput)) {
                 // Game over
             }
