@@ -8,6 +8,9 @@
 #include <cstring>
 using namespace std;
 
+const int TITLE1 = 14;
+const int TITLE2 = 15;
+
 const int MISSION = 11;
 const int INFO = 10;
 const int MISSION_X = 12;
@@ -481,6 +484,29 @@ int main() {
     initscr();
     start_color();
     
+    curs_set(0);
+    noecho();
+    init_pair(TITLE1, COLOR_WHITE, COLOR_BLACK);
+    init_pair(TITLE2, COLOR_BLACK, COLOR_GREEN);
+    int title_x = 10;
+    int title_y = 5;
+    attron(COLOR_PAIR(TITLE1));
+    mvprintw(title_y-1, title_x, "By Changhun and hyunjin");
+    attron(A_BOLD);
+    mvprintw(title_y+7, title_x+12, "Press any key to start game");
+    attroff(COLOR_PAIR(TITLE1));
+    attron(COLOR_PAIR(TITLE2));
+    mvprintw(title_y+0, title_x, "  _________ _______      _____   ____  __.___________");
+    mvprintw(title_y+1, title_x, " /   _____/ \\      \\    /  _  \\ |    |/ _|\\_   _____/");
+    mvprintw(title_y+2, title_x, " \\_____  \\  /   |   \\  /  /_\\  \\|      <   |    __)_ ");
+    mvprintw(title_y+3, title_x, " /        \\/    |    \\/    |    \\    |  \\  |        \\");
+    mvprintw(title_y+4, title_x, "/_______  /\\____|__  /\\____|__  /____|__ \\/_______  /");
+    mvprintw(title_y+5, title_x, "        \\/         \\/         \\/        \\/        \\/ ");
+    attroff(COLOR_PAIR(TITLE2));
+    attroff(A_BOLD);
+    getch();
+    clear();
+
     init_pair(BKGRD, COLOR_BLACK, 
     COLOR_BLACK);
     border('*', '*', '*', '*', '*', '*', '*', '*');
@@ -506,10 +532,8 @@ int main() {
     wrefresh(mission_win);
 
     keypad(stdscr, TRUE);
-    curs_set(0);
-    noecho();
-    nodelay(stdscr, TRUE);
 
+    nodelay(stdscr, TRUE);
     for(int i = 1; i<=5; i++){
         // Game setting
         Game game(game_win, score_win, mission_win, i);
