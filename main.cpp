@@ -10,6 +10,9 @@ using namespace std;
 
 const int MISSION = 11;
 const int INFO = 10;
+const int MISSION_X = 12;
+const int MISSION_V = 13;
+
 const int BKGRD = -1;
 const int BODY = 1;
 const int WALL = 2;
@@ -43,25 +46,32 @@ class Game{
 public:
     int map[21][21];
     int going = NONE;
-    int item_pos[3][2];
+    int item_pos[100][2];
     pos gate_pos[2];
     // int itemcooltime;
     int sc_growth = 0; int sc_poison = 0; int sc_gate = 0;
-    int item_tick = 10;
+    int item_tick;
     int mission[4]; //B,Grwoth,Poison,Gate
     bool game_over = false;
     int gate_cooltime = 0;
     int current_length = 0; int max_length = 0;
+    int stage;
+    int time_limit;
+    int speed;
+    int item_speed;
+    int item_quantity;
+    int difficult;
 
     deque<pos> body;
     WINDOW* win;
     WINDOW* info;
     WINDOW* miss;
 
-    Game(WINDOW* win, WINDOW* info, WINDOW* miss) {
+    Game(WINDOW* win, WINDOW* info, WINDOW* miss, int stage) {
         this->win = win;
         this->info = info;
         this->miss = miss;
+        this->stage = stage;
         init_pair(EMPTY, COLOR_WHITE, COLOR_WHITE);
         init_pair(BODY, COLOR_YELLOW, COLOR_YELLOW);
         init_pair(WALL, COLOR_CYAN, COLOR_CYAN);
@@ -85,6 +95,14 @@ public:
                     else if (map[y][x]==BODY) body.push_back(pos{y, x});
                 }
             }
+            readfile.getline(tmp, 64);
+            speed = stoi(string(tmp));
+            readfile.getline(tmp, 64);
+            item_speed = stoi(string(tmp));
+            readfile.getline(tmp, 64);
+            item_quantity = stoi(string(tmp));
+            readfile.getline(tmp, 64);
+            difficult = stoi(string(tmp));
         } else {
             return 1;
         }
@@ -96,25 +114,65 @@ public:
     }
     void add_mission(){
         srand((unsigned int)time(0));
-        mission[0] = rand()%16 + 3;
-        mission[1] = rand()%5 + 1;
-        mission[2] = rand()%5 + 1;
-        mission[3] = rand()%3 + 1;
+        mission[0] = rand()%5 + 3 + difficult*2;
+        mission[1] = rand()%3 + 1 + difficult;
+        mission[2] = rand()%3 + 1 + difficult;
+        mission[3] = rand()%2 + 1 + difficult;
+        char b[20];
+        time_limit = 550 - difficult*50;
+        wclear(info);
+        wborder(info, '@','@','@','@','@','@','@','@');
         mvwprintw(info, 1, 2, "[ Score Board ]");
         mvwprintw(info, 3, 2, "B :  3/3");
         mvwprintw(info, 4, 2, "+ :  0");
         mvwprintw(info, 5, 2, "- :  0");
         mvwprintw(info, 6, 2, "G :  0");
+        mvwprintw(info, 8, 2, "[ Item Cooltime ]");
+        string tmp = "Item : "+ to_string(item_tick);
+        mvwprintw(info, 9, 2, to_char(tmp,b));
+        wclear(miss);
+        wborder(miss, '@','@','@','@','@','@','@','@');
+
+        wattron(miss, COLOR_PAIR(MISSION)); 
         mvwprintw(miss, 1, 2, "[ MISSION ]");
-        string tmp = "B : "+ to_string(mission[0]) + "  (X)";
-        char b[20];
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+        
+        wattron(miss, COLOR_PAIR(MISSION)); tmp = "Time Limit : "+ to_string(time_limit);
         mvwprintw(miss, 3, 2, to_char(tmp, b));
-        tmp = "+ : "+ to_string(mission[1]) + "  (X)";
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+
+        wattron(miss, COLOR_PAIR(MISSION)); tmp = "B : "+ to_string(mission[0]);
         mvwprintw(miss, 4, 2, to_char(tmp, b));
-        tmp = "- : "+ to_string(mission[2]) + "  (X)";
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+        
+        wattron(miss, COLOR_PAIR(MISSION_X)); tmp = "(X)";
+        mvwprintw(miss, 4, 10, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION_X)); 
+
+        wattron(miss, COLOR_PAIR(MISSION)); tmp = "+ : "+ to_string(mission[1]);
         mvwprintw(miss, 5, 2, to_char(tmp, b));
-        tmp = "G : "+ to_string(mission[3]) + "  (X)";
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+
+        wattron(miss, COLOR_PAIR(MISSION_X)); tmp = "(X)";
+        mvwprintw(miss, 5, 10, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION_X)); 
+
+        wattron(miss, COLOR_PAIR(MISSION)); tmp = "- : "+ to_string(mission[2]);
         mvwprintw(miss, 6, 2, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+
+        wattron(miss, COLOR_PAIR(MISSION_X)); tmp = "(X)";
+        mvwprintw(miss, 6, 10, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION_X)); 
+
+        wattron(miss, COLOR_PAIR(MISSION)); tmp = "G : "+ to_string(mission[3]);
+        mvwprintw(miss, 7, 2, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION)); 
+
+        wattron(miss, COLOR_PAIR(MISSION_X)); tmp = "(X)";
+        mvwprintw(miss, 7, 10, to_char(tmp, b));
+        wattroff(miss, COLOR_PAIR(MISSION_X)); 
+
         wrefresh(info);
         wrefresh(miss);
     }
@@ -122,33 +180,49 @@ public:
         string tmp;
         char b[20];
         tmp = "B :  " + to_string(current_length) + "/" + to_string(max_length);
+        
         mvwprintw(info, 3, 2, to_char(tmp, b));
-        if(max_length == mission[0]) mvwprintw(miss, 3, 9, "(V)");
+        wattron(miss, COLOR_PAIR(MISSION_V)); 
+        if(max_length == mission[0]) mvwprintw(miss, 4, 10, "(V)");
+        wattroff(miss, COLOR_PAIR(MISSION_V)); 
         switch(item){
             case GROWTH:
+                wattron(miss, COLOR_PAIR(INFO)); 
                 tmp = "+ :  "+ to_string(sc_growth);
                 mvwprintw(info, 4, 2, to_char(tmp, b));
-                if(sc_growth == mission[1]) mvwprintw(miss, 4, 9, "(V)");
+                wattroff(miss, COLOR_PAIR(INFO)); 
+                wattron(miss, COLOR_PAIR(MISSION_V)); 
+                if(sc_growth == mission[1]) mvwprintw(miss, 5, 10, "(V)");
+                wattroff(miss, COLOR_PAIR(MISSION_V)); 
                 break;
             case POISON:
+                wattron(miss, COLOR_PAIR(INFO));
                 tmp = "- :  "+ to_string(sc_poison);
                 mvwprintw(info, 5, 2, to_char(tmp, b));
-                if(sc_poison == mission[2]) mvwprintw(miss, 5, 9, "(V)");
+                wattroff(miss, COLOR_PAIR(INFO)); 
+                wattron(miss, COLOR_PAIR(MISSION_V)); 
+                if(sc_poison == mission[2]) mvwprintw(miss, 6, 10, "(V)");
+                wattroff(miss, COLOR_PAIR(MISSION_V)); 
                 break;
             case GATE1:
             case GATE2:
+                wattron(miss, COLOR_PAIR(INFO));
                 tmp = "G :  "+ to_string(sc_gate);
                 mvwprintw(info, 6, 2, to_char(tmp, b));
-                if(sc_gate == mission[3]) mvwprintw(miss, 6, 9, "(V)");
+                wattroff(miss, COLOR_PAIR(INFO)); 
+                wattron(miss, COLOR_PAIR(MISSION_V)); 
+                if(sc_gate == mission[3]) mvwprintw(miss, 7, 10, "(V)");
+                wattroff(miss, COLOR_PAIR(MISSION_V)); 
                 break;
         }
+        wattroff(miss, COLOR_PAIR(MISSION_V)); 
         if(mission[0] <= max_length && mission[1] <= sc_growth && mission[2] <= sc_poison && mission[3] <= sc_gate) return true;
         wrefresh(info);
         wrefresh(miss);
         return false;
     }
     void clear_item(){
-        for(int i = 0; i<3; i++){
+        for(int i = 0; i<item_quantity; i++){
             if(map[item_pos[i][0]][item_pos[i][1]]!=BODY) map[item_pos[i][0]][item_pos[i][1]] = EMPTY;
         }
         wrefresh(win);
@@ -160,7 +234,7 @@ public:
     }
     void random_item(){
         srand((unsigned int)time(0));
-        int percent = rand()%4;
+        int percent = rand()%(item_quantity+1);
         for(int i = 0; i<percent; i++){
             while(true){
                 int item_y = rand()%17 + 2; //1~19 random
@@ -173,7 +247,7 @@ public:
                 }
             }
         } //growth
-        for(int i = percent; i<3; i++){
+        for(int i = percent; i<item_quantity; i++){
             while(true){
                 int item_y = rand()%17 + 2; //1~19 random
                 int item_x = rand()%17 + 2;
@@ -213,6 +287,7 @@ public:
         going = LEFT;
         current_length = 3;
         max_length = 3;
+        item_tick = item_speed;
         random_item();
         random_gate();
         add_mission();
@@ -222,12 +297,23 @@ public:
         if (item_tick-- == 0) {
             clear_item();
             random_item();
-            item_tick = 10;
+            item_tick = item_speed;
         }
+        string tmp = "Item : "+ to_string(item_tick) + "     ";
+        char b[25];
+        mvwprintw(info, 9, 2, to_char(tmp,b));
         if (gate_cooltime-- == 0) {
             clear_gate();
             random_gate();
         }
+        if(time_limit-- == 0){
+            game_over = true;
+            return false;
+        }
+        tmp = "Time Limit : "+ to_string(time_limit) + "   ";
+        mvwprintw(miss, 3, 2, to_char(tmp, b));
+        wrefresh(miss);
+        wrefresh(info);
         return move(lastinput);
     }
     bool is_center(pos gate) {
@@ -401,21 +487,21 @@ int main() {
     refresh();
 
     game_win = newwin(22, 42, 1, 1);
-    wbkgd(game_win, COLOR_PAIR(1));
-    mvwprintw(game_win, 1, 1, "A new window");
     wrefresh(game_win);
 
     init_pair(INFO, COLOR_WHITE, COLOR_BLACK);
-    score_win = newwin(8, 30, 3, 47);
+    score_win = newwin(11, 30, 1, 47);
     wbkgd(score_win, COLOR_PAIR(INFO));
     wattron(score_win, COLOR_PAIR(INFO));
     wborder(score_win, '@','@','@','@','@','@','@','@');
     wrefresh(score_win);
 
     init_pair(MISSION, COLOR_WHITE, COLOR_CYAN);
-    mission_win = newwin(8, 30, 12, 47);
+    init_pair(MISSION_X, COLOR_WHITE, COLOR_RED);
+    init_pair(MISSION_V, COLOR_WHITE, COLOR_GREEN);
+
+    mission_win = newwin(9, 30, 13, 47);
     wbkgd(mission_win, COLOR_PAIR(MISSION));
-    wattron(mission_win, COLOR_PAIR(MISSION));
     wborder(mission_win, '@','@','@','@','@','@','@','@');
     wrefresh(mission_win);
 
@@ -426,18 +512,21 @@ int main() {
 
     for(int i = 1; i<=5; i++){
         // Game setting
-        Game game(game_win, score_win, mission_win);
+        Game game(game_win, score_win, mission_win, i);
         int lastinput = NONE;
         int lasttime = getms();
         game.init("maps/" + to_string(i));
 
         // Main loop
         while (true) {
-            int i = getch();
-            if (258<=i && i<=261) lastinput = i - 258;
+            int inp = getch();
+            if (inp == 110 || inp == 78) {
+                break;
+            }
+            if (258<=inp && inp<=261) lastinput = inp - 258;
             int now = getms();
             int dt = now - lasttime;
-            if (dt>=300) {
+            if (dt>=game.speed) {
                 if (!game.tick(lastinput)) {
                     // Game over
                     break;
@@ -450,11 +539,47 @@ int main() {
             }
         }
 
-        if(game.game_over) break;
+        //game_over || game_clear
+        if(game.game_over){
+            wclear(mission_win);
+            mvwprintw(mission_win, 1, 8, "[ Game Over! ]");
+            mvwprintw(mission_win, 3, 11, "ReStart?");
+            mvwprintw(mission_win, 4, 13, "Y/N");
+            wborder(mission_win, '@','@','@','@','@','@','@','@');
+            wrefresh(mission_win);
+            int b;
+            while(true){
+                b = getch();
+                if(b == 121 || b == 89){
+                    i--;
+                    break;
+                }
+                else if(b == 110 || b == 78) break;
+            }
+            if(b == 110 || b == 78) break; 
+        }
+        else if(i == 4){
+            wclear(mission_win);
+            mvwprintw(mission_win, 1, 7, "[ Game Clear! ]");
+            mvwprintw(mission_win, 3, 11, "ReStart?");
+            mvwprintw(mission_win, 4, 13, "Y/N");
+            wborder(mission_win, '@','@','@','@','@','@','@','@');
+            wrefresh(mission_win);
+            int b;
+            while(true){
+                b = getch();
+                if(b == 121 || b == 89){
+                    i--;
+                    break;
+                }
+                else if(b == 110 || b == 78) break;
+            }
+            if(b == 110 || b == 78) break; 
+        }
 
         getch();
     }
     delwin(game_win);
     endwin();
     return 0;
-}
+} 
