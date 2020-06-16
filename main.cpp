@@ -491,7 +491,7 @@ int main() {
     int title_x = 10;
     int title_y = 5;
     attron(COLOR_PAIR(TITLE1));
-    mvprintw(title_y-1, title_x, "By Changhun and hyunjin");
+    mvprintw(title_y-1, title_x, "By TEAM Young-Rock");
     attron(A_BOLD);
     mvprintw(title_y+7, title_x+12, "Press any key to start game");
     attroff(COLOR_PAIR(TITLE1));
