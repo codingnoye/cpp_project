@@ -16,7 +16,7 @@ const int INFO = 10;
 const int MISSION_X = 12;
 const int MISSION_V = 13;
 
-const int BKGRD = -1;
+const int BKGRD = 16;
 const int BODY = 1;
 const int WALL = 2;
 const int IWALL = 3;
@@ -515,7 +515,7 @@ int main() {
     game_win = newwin(22, 42, 1, 1);
     wrefresh(game_win);
 
-    init_pair(INFO, COLOR_WHITE, COLOR_BLACK);
+    init_pair(INFO, COLOR_WHITE, COLOR_MAGENTA);
     score_win = newwin(11, 30, 1, 47);
     wbkgd(score_win, COLOR_PAIR(INFO));
     wattron(score_win, COLOR_PAIR(INFO));
@@ -593,7 +593,7 @@ int main() {
             while(true){
                 b = getch();
                 if(b == 121 || b == 89){
-                    i--;
+                    i=0;
                     break;
                 }
                 else if(b == 110 || b == 78) break;
