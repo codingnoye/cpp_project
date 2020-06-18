@@ -5,6 +5,7 @@
 #include <fstream>
 #include <deque>
 #include <cstring>
+#include <cstdlib>
 using namespace std;
 
 const int TITLE1 = 14;
